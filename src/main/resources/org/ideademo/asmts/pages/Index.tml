@@ -1,0 +1,180 @@
+<html t:type="layout" title="assessments"
+      xmlns:t="http://tapestry.apache.org/schema/tapestry_5_3.xsd"
+      xmlns:p="tapestry:parameter">
+ 
+<body>
+    <ul id="nav">
+     <li><a href="../index.php"><span>Home</span></a></li>
+     <li><a href="/daps" title="daps"><span>Data &amp; Products</span></a></li>
+     <li><a href="/paws" title="paws"><span>Projects &amp; Activities</span></a></li>
+     <li id="nav-1"><t:pagelink page="prop:componentResources.pageName"><u>Assessments</u></t:pagelink></li>
+     <li><a href="/parts" title="programs"><span>Partners &amp; Programs</span></a></li>
+    </ul>
+    
+
+    <div id = "bodyContainer"> 
+		<div id ="searchContainer">
+		
+		 <form t:type="form" t:id="searchCriteria" action="daps" method="post">
+		   <table width="750">
+		   <tr>
+		      <td width="175">
+		        <t:label for="type"/>:<br />
+		        <t:select t:id="type" blankOption="ALWAYS" t:blankLabel="All"    
+		                  onchange="this.form.submit()" width="175" style="width:175px;font-size:11px;overflow: auto;" />
+		      </td>
+		      <td width="175">
+		        <t:label for="area"/>:<br />
+		        <t:select t:id="area" blankOption="ALWAYS" t:blankLabel="All"    
+		                  onchange="this.form.submit()" width="175" style="width:175px;font-size:11px;overflow: auto;" />
+		      </td>
+		      <td width="175">
+		        <t:label for="focusarea"/>:<br />
+		        <t:select t:id="focusarea" blankOption="ALWAYS" t:blankLabel="All"    
+		                  onchange="this.form.submit()" width="175" style="width:175px;font-size:11px;overflow: auto;" />
+		      </td>
+		      <td width="175">
+		        <t:label for="regions"/>:<br />
+		        <t:select t:id="regions" blankOption="ALWAYS" t:blankLabel="All"    
+		                  onchange="this.form.submit()" width="175" style="width:175px;font-size:11px;overflow: auto;" />
+		      </td>
+	      </tr>
+         </table>
+		   
+		
+		    <table width="750" style="border-collapse: collapse; border-spacing: 0;">
+		     <tr class="title-blue" border="1">
+		        <td  align="right" width="150">Text Search</td>
+		        <td align="left">
+                   <input t:type="TextField" t:id="searchText" size="50" value="searchText" />
+                   <t:submit t:id="search" value="Go" /><t:submit t:id="clear" value="Clear/Show All" />
+                 </td>
+		      </tr>
+		    </table>
+          </form>  
+		</div><!-- End of "searchContainer" -->
+    
+
+
+ <div id="container3"><!-- Contains the accordion. Allows for padding on the top of the accordion to fit and look better on page-->
+  <div id="container2"><!-- This contains the scroll css code. -->
+   <div id="Accordion1" class="Accordion" tabindex="0">
+
+
+   
+     <div class="AccordionPanel" t:type="Loop" t:source="list" t:value="row">
+      <div class="AccordionPanelTab">
+
+       <table class="project-box">
+        <colgroup>
+          <col class="title-blue" />
+        </colgroup>
+        <tr>
+         <td width="67" style="width: 67px">Name</td>
+         <td>${row.name}</td>
+        </tr>
+       </table>
+
+    </div><!-- End Accordion Panel Tab -->
+
+
+    <div class="AccordionPanelContent"><!--added by cameron-->
+
+    <table class="project-box">
+     <colgroup>
+      <col class="title-blue" />
+     </colgroup>
+     <tr>
+      <td>Description</td>
+      <td>${row.description}(<t:pagelink page="asmt/view" context="row.id" target="_blank">More&hellip;</t:pagelink>)</td>
+     </tr>
+     
+     <tr>
+      <td>Status</td>
+      <td>
+       <ul style="display: inline;margin-left: 0;padding-left: 0;">
+        <t:if test="${row.completed}"><li style="margin-left: 13px;">${message:COMPLETED}</li></t:if> 
+        <t:if test="${row.ongoing}"><li style="margin-left: 13px;">${message:ONGOING}</li></t:if> 
+        <t:if test="${row.planned}"><li style="margin-left: 13px;">${message:PLANNED}</li></t:if> 
+        <t:if test="${row.proposed}"><li style="margin-left: 13px;">${message:PROPOSED}</li></t:if> 
+       </ul>
+       </td>
+     </tr>
+     
+     <tr>
+      <td>Type</td>
+      <td>
+       <ul style="display: inline;margin-left: 0;padding-left: 0;">
+        <t:if test="${row.climateScience}"><li style="margin-left: 13px;">${message:SCIENCE}</li></t:if> 
+        <t:if test="${row.needsAndCapabilities}"><li style="margin-left: 13px;">${message:NEEDS}</li></t:if> 
+        <t:if test="${row.riskVulnerability}"><li style="margin-left: 13px;">${message:PROBLEM}</li></t:if> 
+       </ul>
+       </td>
+     </tr>
+     
+     <tr>
+      <td>Applicability</td>
+      <td>
+       <ul style="display: inline;margin-left: 0;padding-left: 0;">
+        <t:if test="${row.international}"><li style="margin-left: 13px;">${message:INTERNATIONAL}</li></t:if> 
+        <t:if test="${row.national}"><li style="margin-left: 13px;">${message:NATIONAL}</li></t:if> 
+        <t:if test="${row.regional}"><li style="margin-left: 13px;">${message:REGIONAL}</li></t:if> 
+       </ul>
+       </td>
+     </tr>
+
+     <tr>
+      <td>Focus Area</td>
+      <td>
+        <t:if test="${row.water}"><img src="${context:layout/images/fresh2.jpg}" alt="${message:FRESH}" title="${message:FRESH}" /></t:if> 
+        <t:if test="${row.coastal}"><img src="${context:layout/images/coastal2.jpg}" alt="${message:COASTAL}" title="${message:COASTAL}" /></t:if> 
+        <t:if test="${row.ecosystem}"><img src="${context:layout/images/marine2.jpg}" alt="${message:MARINE}" title="${message:MARINE}" /></t:if>
+       </td>
+     </tr>
+     
+     <tr>
+      <td>Region</td>
+      <td>
+       <ul style="display: inline;margin-left: 0;padding-left: 0;">
+        <t:if test="${row.centralNorthPacific}"><li style="margin-left: 13px;">${message:CNP-short}</li></t:if> 
+        <t:if test="${row.westernNorthPacific}"><li style="margin-left: 13px;">${message:WNP-short}</li></t:if> 
+        <t:if test="${row.southPacific}"><li style="margin-left: 13px;">${message:SP-short}</li></t:if> 
+        <t:if test="${row.pacificBasin}"><li style="margin-left: 13px;">${message:BAS}</li></t:if> 
+        <t:if test="${row.global}"><li style="margin-left: 13px;">${message:GLB}</li></t:if> 
+        </ul>
+       </td>
+     </tr>
+     
+     <tr>
+      <td>Lead Agencies</td>
+      <td>${row.organization}</td>
+     </tr>
+
+     <tr>
+      <td>Contacts</td>
+      <td>${row.contact}</td>
+     </tr>
+
+
+    </table>
+
+        <!-- Column 1 end -->
+    </div><!-- End of AccordionPanelContent -->
+   </div><!-- End of AccordionPanel (both content and tab)  -->
+
+
+   </div><!-- End of Accordion 1 -->
+  </div><!-- End of "container 2" -->
+ </div><!-- End of "container 3" -->
+
+  
+    
+    
+    </div><!--end of bodyContainer-->
+    
+<script type="text/javascript"><!--added by cameron-->
+var Accordion1 = new Spry.Widget.Accordion("Accordion1",{useFixedPanelHeights: false, defaultPanel: -1 });
+</script><!--(works only if loaded at end) -->
+
+</body>
+</html>
