@@ -6,16 +6,16 @@
     <ul id="nav">
      <li><a href="../index.php"><span>Home</span></a></li>
      <li><a href="/daps" title="daps"><span>Data &amp; Products</span></a></li>
-     <li><a href="/paws" title="paws"><span>Projects &amp; Activities</span></a></li>
+     <li><a href="/pawz" title="paws"><span>Projects &amp; Activities</span></a></li>
      <li id="nav-1"><t:pagelink page="prop:componentResources.pageName"><u>Assessments</u></t:pagelink></li>
-     <li><a href="/parts" title="programs"><span>Partners &amp; Programs</span></a></li>
+     <li><a href="/orgs" title="programs"><span>Partners &amp; Programs</span></a></li>
     </ul>
     
 
     <div id = "bodyContainer"> 
 		<div id ="searchContainer">
 		
-		 <form t:type="form" t:id="searchCriteria" action="daps" method="post">
+		 <form t:type="form" t:id="searchCriteria" action="asmts" method="post">
 		   <table width="750">
 		   <tr>
 		      <td width="175">
