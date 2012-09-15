@@ -1,4 +1,4 @@
-<html t:type="input" title="Create Assessment"
+<html t:type="longform" title="Create Assessment"
       xmlns:t="http://tapestry.apache.org/schema/tapestry_5_3.xsd"
       xmlns:p="tapestry:parameter">
       
@@ -157,16 +157,6 @@
 		<t:label class="description" for="worksheet" />
 		<t:textArea t:id="worksheet" t:validate="maxlength=255" rows="1" cols="90" value="entity.worksheet" />
 		</li>
-
-
-
-     <li class="buttons">
-       <t:submit class="button_text" value="Add/Update" />
-       <t:submit t:id="search" value="Search" />
-       (<t:pagelink page="prop:componentResources.pageName">CLEAR - form</t:pagelink>)
-       (<t:pagelink page="asmts">CANCEL - go to list</t:pagelink>)
-       
-     </li>
 
    </ul>
   </t:form>	
