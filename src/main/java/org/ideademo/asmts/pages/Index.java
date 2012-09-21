@@ -3,10 +3,12 @@ package org.ideademo.asmts.pages;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.StringTokenizer;
 import java.util.Vector;
 
 import org.apache.tapestry5.PersistenceConstants;
 
+import org.apache.tapestry5.annotations.PageActivationContext;
 import org.apache.tapestry5.annotations.Property;
 import org.apache.tapestry5.annotations.Persist;
 
@@ -23,7 +25,11 @@ import org.hibernate.criterion.MatchMode;
 
 import org.hibernate.search.FullTextSession;
 import org.hibernate.search.Search;
+
+import org.hibernate.search.query.dsl.BooleanJunction;
 import org.hibernate.search.query.dsl.QueryBuilder;
+import org.hibernate.search.query.dsl.TermMatchingContext;
+
 
 import org.ideademo.asmts.entities.Asmt;
 
@@ -60,7 +66,14 @@ public class Index
   @Inject
   private HibernateSessionManager sessionManager;
 
-  
+
+  @Property 
+  @Persist (PersistenceConstants.FLASH)
+  int retrieved; 
+  @Property 
+  @Persist (PersistenceConstants.FLASH)
+  int total;
+
   ///////////////////////////////////////////////////////////////////////////////////////////////////////
   //  Select Boxes - Enumaration values - the user-visible labels are externalized in Index.properties 
   
@@ -129,9 +142,13 @@ public class Index
 	if (regions != null) onValueChangedFromRegions(regions.toString());
 	// at this point all the booleans in example have been set.
 	// NOTE/MAY BE TODO: Lucene dependency may be removed by setting the text search criteria into various text fields of the example. 
+    // Get all records anyway - for showing total at bottom of presentation layer
+    List <Asmt> alst = session.createCriteria(Asmt.class).list();
+    total = alst.size();
+
 	
-	// then makes lists and sublists as per the search criteria 
-	List<Asmt> xlst=null; // xlst = Query by Example search List
+    // then makes lists and sublists as per the search criteria 
+    List<Asmt> xlst=null; // xlst = Query by Example search List
     if(example != null)
     {
        Example ex = Example.create(example).excludeFalse().ignoreCase().enableLike(MatchMode.ANYWHERE);
@@ -141,12 +158,12 @@ public class Index
        
        if (xlst != null)
        {
-    	   logger.info("Example Search Result List Size  = " + xlst.size() );
+    	   logger.info("Asmt Example Search Result List Size  = " + xlst.size() );
     	   Collections.sort(xlst);
        }
        else
        {
-         logger.info("Example Search result did not find any results...");
+         logger.info("Asmt Example Search result did not find any results...");
        }
     }
     
@@ -164,12 +181,21 @@ public class Index
        }
       
        QueryBuilder qb = fullTextSession.getSearchFactory().buildQueryBuilder().forEntity( Asmt.class ).get();
-       org.apache.lucene.search.Query luceneQuery = qb
-			    .keyword()
-			    .onFields("code","name","description", "keywords","contact", "organization", "url", "worksheet", "partners")
-			    .matching(searchText)
-			    .createQuery();
-      	  
+       
+       // fields being covered by text search 
+       TermMatchingContext onFields = qb
+		        .keyword()
+		        .onFields("code","name","description", "keywords","contact", "organization", "url", "worksheet", "partners");
+       
+       BooleanJunction<BooleanJunction> bool = qb.bool();
+       /////// Tokenize the search string for default AND logic ///
+       StringTokenizer st = new StringTokenizer(searchText);
+       while (st.hasMoreElements()) {
+    	   bool.must(onFields.matching(st.nextElement()).createQuery());
+       }
+       
+       org.apache.lucene.search.Query luceneQuery = bool.createQuery();
+       
        tlst = fullTextSession.createFullTextQuery(luceneQuery, Asmt.class).list();
        if (tlst != null) 
        {
@@ -187,44 +213,68 @@ public class Index
     if (example == null && (searchText == null || searchText.trim().length() == 0))
     {
     	// Everything...
-    	List <Asmt> alst = session.createCriteria(Asmt.class).list(); // alst = List of all records 
     	if (alst != null && alst.size() > 0)
     	{
-    		logger.info ("Returing all " + alst.size() + " Asmt records");
+    		logger.info ("Returing all " + alst.size() + " Asmts records");
         	Collections.sort(alst);
     	}
     	else
     	{
     		logger.warn("No Asmt records found in the database");
     	}
+    	retrieved = total;
         return alst; 
     }
     else if (xlst == null && tlst != null)
     {
     	// just text search results
-    	logger.info("Returing " + tlst.size() + " records as a result of PURE text search (no QBE) for " + searchText);
+    	logger.info("Returing " + tlst.size() + " Asmts records as a result of PURE text search (no QBE) for " + searchText);
+    	retrieved = tlst.size();
     	return tlst;
     }
     else if (xlst != null && tlst == null)
     {
     	// just example query results
-    	logger.info("Returning " + xlst.size() + " records as a result ofPURE Query-By-Example (QBE), no text string");
+    	logger.info("Returning " + xlst.size() + " Asmts records as a result of PURE Query-By-Example (QBE), no text string");
+    	retrieved = xlst.size();
     	return xlst;
     }
     else 
     {
+
+        ////////////////////////////////////////////
     	// get the INTERSECTION of the two lists
     	
     	// TRIVIAL: if one of them is empty, return the other
-    	if (xlst.size() == 0 && tlst.size() > 0) return tlst;
-    	if (tlst.size() == 0 && xlst.size() > 0) return xlst;
+    	// if one of them is empty, return the other
+    	if (xlst.size() == 0 && tlst.size() > 0)
+    	{
+        	logger.info("Returing " + tlst.size() + " Asmts records as a result of ONLY text search, QBE pulled up ZERO records for " + searchText);
+        	retrieved = tlst.size();
+    		return tlst;
+    	}
+
+    	if (tlst.size() == 0 && xlst.size() > 0)
+    	{
+        	logger.info("Returning " + xlst.size() + " Asmts records as a result of ONLY Query-By-Example (QBE), text search pulled up NOTHING for string " + searchText);
+        	retrieved = xlst.size();
+	        return xlst;
+    	}
     	
     	
     	List <Asmt> ivec = new Vector<Asmt>();
     	// if both are empty, return this Empty vector. 
-    	if (xlst.size() == 0 && tlst.size() == 0) return ivec; 
+    	if (xlst.size() == 0 && tlst.size() == 0)
+    	{
+        	logger.info("Neither QBE nor text search for string " + searchText +  " pulled up ANY Asmts Records.");
+        	retrieved = 0;
+    		return ivec;
+    	}
     	
-    	// now deal with BOTH text and QBE being non-empty lists - by Id
+
+
+    	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    	// now deal with BOTH text and QBE being non-empty lists - implementing intersection by Database Primary Key -  Id
     	Iterator<Asmt> xiterator = xlst.iterator();
     	while (xiterator.hasNext()) 
     	{
@@ -247,6 +297,8 @@ public class Index
     	}
     	// sort again - 
     	if (ivec.size() > 0)  Collections.sort(ivec);
+    	logger.info("Returning " + ivec.size() + " Asmts records from COMBINED (text, QBE) Search");
+    	retrieved = ivec.size();
     	return ivec;
     }
     
