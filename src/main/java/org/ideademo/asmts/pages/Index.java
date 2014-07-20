@@ -1,45 +1,59 @@
 package org.ideademo.asmts.pages;
 
+import java.awt.Toolkit;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.io.StringReader;
 import java.io.IOException;
-
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.Vector;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.util.Version;
-
+import org.apache.tapestry5.Asset;
 import org.apache.tapestry5.PersistenceConstants;
-
-import org.apache.tapestry5.annotations.PageActivationContext;
+import org.apache.tapestry5.StreamResponse;
+import org.apache.tapestry5.annotations.Path;
 import org.apache.tapestry5.annotations.Property;
 import org.apache.tapestry5.annotations.Persist;
-
-
 import org.apache.tapestry5.hibernate.HibernateSessionManager;
-
+import org.apache.tapestry5.internal.TapestryInternalUtils;
+import org.apache.tapestry5.ioc.Messages;
 import org.apache.tapestry5.ioc.annotations.Inject;
-
+import org.apache.tapestry5.services.AssetSource;
 
 import org.hibernate.Session;
-
 import org.hibernate.criterion.Example;
 import org.hibernate.criterion.MatchMode;
-
 import org.hibernate.search.FullTextSession;
 import org.hibernate.search.Search;
-
 import org.hibernate.search.query.dsl.BooleanJunction;
 import org.hibernate.search.query.dsl.QueryBuilder;
 import org.hibernate.search.query.dsl.TermMatchingContext;
-
-
 import org.ideademo.asmts.entities.Asmt;
+import org.ideademo.asmts.services.util.PDFStreamResponse;
 
+import com.itextpdf.text.Anchor;
+import com.itextpdf.text.BaseColor;
+import com.itextpdf.text.Chunk;
+import com.itextpdf.text.Document;
+import com.itextpdf.text.DocumentException;
+import com.itextpdf.text.ListItem;
+import com.itextpdf.text.Paragraph;
+import com.itextpdf.text.Phrase;
+import com.itextpdf.text.pdf.PdfPCell;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfWriter;
 
 import org.apache.log4j.Logger;
 
@@ -81,6 +95,16 @@ public class Index
   @Property 
   @Persist (PersistenceConstants.FLASH)
   int total;
+  
+  @Inject
+  @Path("context:layout/images/image067.gif")
+  private Asset logoAsset;
+  
+  @Inject
+  private AssetSource assetSource;
+  
+  @Inject
+  Messages messages;
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////////
   //  Select Boxes - Enumaration values - the user-visible labels are externalized in Index.properties 
@@ -543,8 +567,698 @@ public class Index
     this.example = x;
   }
 
-  
-  
+  public StreamResponse onSelectedFromPdf() 
+  {
+      // Create PDF
+      InputStream is = getPdfTable(getList());
+      // Return response
+      return new PDFStreamResponse(is,"PacisAssessments" + System.currentTimeMillis());
+  }
+
+  private InputStream getPdfTable(List list) 
+  {
+
+      // step 1: creation of a document-object
+      Document document = new Document();
+
+      ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+      try {
+              // step 2:
+              // we create a writer that listens to the document
+              // and directs a PDF-stream to a file
+              PdfWriter writer = PdfWriter.getInstance(document, baos);
+              // step 3: we open the document
+              document.open();
+              
+              java.awt.Image awtImage = Toolkit.getDefaultToolkit().createImage(logoAsset.getResource().toURL());
+              if (awtImage != null)
+              {
+            	  com.itextpdf.text.Image logo = com.itextpdf.text.Image.getInstance(awtImage, null); 
+            	  logo.scalePercent(50);
+            	  if (logo != null) document.add(logo);
+              }
+
+              DateFormat formatter = new SimpleDateFormat
+                      ("EEE MMM dd HH:mm:ss zzz yyyy");
+                  Date date = new Date(System.currentTimeMillis());
+                  TimeZone eastern = TimeZone.getTimeZone("Pacific/Honolulu");
+                  formatter.setTimeZone(eastern);
+
+              document.add(new Paragraph("Piko Assessments " + formatter.format(date)));
+              
+              String subheader = "Printing " + retrieved + " of total " + total + " records.";
+              if (StringUtils.isNotBlank(searchText))
+              {
+            	  subheader += "  Searching for \"" + searchText + "\""; 
+              }
+              
+              document.add(new Paragraph(subheader));
+              document.add(Chunk.NEWLINE);document.add(Chunk.NEWLINE);
+              
+              // create table, 2 columns
+           	Iterator<Asmt> iterator = list.iterator();
+           	int count=0;
+       		while(iterator.hasNext())
+      		{
+       			count++;
+          		Asmt asmt = iterator.next();
+          		
+          		String acronym = StringUtils.trimToEmpty(asmt.getCode());
+          		String name = StringUtils.trimToEmpty(asmt.getName());
+          		String description = StringUtils.trimToEmpty(asmt.getDescription());
+          		String leadAgencies = StringUtils.trimToEmpty(asmt.getOrganization());
+          		String contacts = StringUtils.trimToEmpty(asmt.getContact());
+          		String partnering = StringUtils.trimToEmpty(asmt.getPartners());
+          		String url = StringUtils.trimToEmpty(asmt.getUrl());
+          		
+          		
+                PdfPTable table = new PdfPTable(2);
+                table.setWidths(new int[]{1, 4});
+                table.setSplitRows(false);
+                
+                PdfPCell nameTitle = new PdfPCell(new Phrase("#" + count + ") Name")); 
+                
+                if (StringUtils.isNotBlank(acronym)) name = name + " (" + acronym + ")";
+                PdfPCell nameCell = new PdfPCell(new Phrase(name));
+                
+                nameTitle.setBackgroundColor(BaseColor.CYAN);  nameCell.setBackgroundColor(BaseColor.LIGHT_GRAY);
+                
+                table.addCell(nameTitle);  table.addCell(nameCell);          		          		
+          		
+          		if (StringUtils.isNotBlank(leadAgencies))
+          		{
+          		  table.addCell(new PdfPCell(new Phrase("Lead Agencies")));  table.addCell(new PdfPCell(new Phrase(leadAgencies)));
+          		}
+
+          		if (StringUtils.isNotBlank(contacts))
+          		{
+          		  table.addCell(new PdfPCell(new Phrase("Contacts")));  table.addCell(new PdfPCell(new Phrase(contacts)));
+          		}
+                
+          		if (StringUtils.isNotBlank(partnering))
+          		{
+          		  table.addCell(new PdfPCell(new Phrase("Partnering Agencies")));  table.addCell(new PdfPCell(new Phrase(partnering)));
+          		}
+
+
+          	    // compile the types list
+          		com.itextpdf.text.List types = new com.itextpdf.text.List(com.itextpdf.text.List.UNORDERED);
+          		if (asmt.isClimateScience()) 
+          		{
+          			ListItem item = new ListItem(getLabel("climateScience")); types.add(item);
+          		}
+          		if (asmt.isNeedsAndCapabilities()) 
+          		{
+          			ListItem item = new ListItem(getLabel("needsAndCapabilities")); types.add(item);
+          		}
+          		if (asmt.isNeeds()) 
+          		{
+          			ListItem item = new ListItem(getLabel("needs")); types.add(item);
+          		}
+          		if (asmt.isCapacity()) 
+          		{
+          			ListItem item = new ListItem(getLabel("capacity")); types.add(item);
+          		}
+          		if (asmt.isCapabilities()) 
+          		{
+          			ListItem item = new ListItem(getLabel("capabilities")); types.add(item);
+          		}
+          		if (asmt.isRiskVulnerability()) 
+          		{
+          			ListItem item = new ListItem(getLabel("riskVulnerability")); types.add(item);
+          		}
+
+
+          		if(types.size() > 0)
+          		{
+          		  PdfPCell typesCell = new PdfPCell(); typesCell.addElement(types);
+          		  table.addCell(new PdfPCell(new Phrase("Types")));  table.addCell(typesCell);
+          		}
+          		
+          		
+                //Aoa
+          		com.itextpdf.text.List aoa = new com.itextpdf.text.List(com.itextpdf.text.List.UNORDERED);
+          		if(asmt.isInternational())
+          		{
+          			ListItem item = new ListItem(getLabel("international")); aoa.add(item);
+          		}
+          		if(asmt.isNational())
+          		{
+          			ListItem item = new ListItem(getLabel("national")); aoa.add(item);
+          		}
+          		if(asmt.isRegional())
+          		{
+          			ListItem item = new ListItem(getLabel("regional")); aoa.add(item);
+          		}
+          		
+          		if (aoa.size() > 0)
+          		{
+           		  PdfPCell aoaCell = new PdfPCell(); aoaCell.addElement(aoa);
+           		  table.addCell(new PdfPCell(new Phrase("Area of Applicability")));  table.addCell(aoaCell);
+          		}
+          		
+          		// focus area
+          		com.itextpdf.text.List fa = new com.itextpdf.text.List(com.itextpdf.text.List.UNORDERED);
+          		if(asmt.isWater())
+          		{
+          			ListItem item = new ListItem(getLabel("water")); fa.add(item);
+          		}
+          		if(asmt.isCoastal())
+          		{
+          			ListItem item = new ListItem(getLabel("coastal")); fa.add(item);
+          		}
+          		if(asmt.isEcosystem())
+          		{
+          			ListItem item = new ListItem(getLabel("ecosystem")); fa.add(item);
+          		}
+          		
+          		if (fa.size() > 0)
+          		{
+           		  PdfPCell faCell = new PdfPCell(); faCell.addElement(fa);
+           		  table.addCell(new PdfPCell(new Phrase("Focus Area")));  table.addCell(faCell);
+          		}
+
+               
+          		//region
+          		com.itextpdf.text.List regions = new com.itextpdf.text.List(com.itextpdf.text.List.UNORDERED);
+          		if (asmt.isCentralNorthPacific())
+          		{
+          			ListItem item = new ListItem(getLabel("centralNorthPacific")); regions.add(item);
+          		}
+          		if (asmt.isStateOfHawaii())
+          		{
+          			ListItem item = new ListItem(getLabel("stateOfHawaii")); regions.add(item);
+          		}
+          		if (asmt.isNorthWestHawaiianIslands())
+          		{
+          			ListItem item = new ListItem(getLabel("northWesternHawaiianIslands")); regions.add(item);
+          		}
+          		if (asmt.isPacificRemoteIslands())
+          		{
+          			ListItem item = new ListItem(getLabel("pacificRemoteIslands")); regions.add(item);
+          		}
+          		if (asmt.isWesternNorthPacific())
+          		{
+          			ListItem item = new ListItem(getLabel("westernNorthPacific")); regions.add(item);
+          		}
+          		if (asmt.isCnmi())
+          		{
+          			ListItem item = new ListItem(getLabel("cnmi")); regions.add(item);
+          		}
+          		if (asmt.isFsm())
+          		{
+          			ListItem item = new ListItem(getLabel("fsm")); regions.add(item);
+          		}
+          		if (asmt.isGuam())
+          		{
+          			ListItem item = new ListItem(getLabel("guam")); regions.add(item);
+          		}
+          		if (asmt.isPalau())
+          		{
+          			ListItem item = new ListItem(getLabel("palau")); regions.add(item);
+          		}
+          		if (asmt.isRmi())
+          		{
+          			ListItem item = new ListItem(getLabel("rmi")); regions.add(item);
+          		}
+          		if (asmt.isOtherWesternNorthPacific())
+          		{
+          			ListItem item = new ListItem(getLabel("otherWesternNorthPacific")); regions.add(item);
+          		}
+          		if (asmt.isSouthPacific())
+          		{
+          			ListItem item = new ListItem(getLabel("southPacific")); regions.add(item);
+          		}
+          		if (asmt.isAmericanSamoa())
+          		{
+          			ListItem item = new ListItem(getLabel("americanSamoa")); regions.add(item);
+          		}
+          		if (asmt.isAustralia())
+          		{
+          			ListItem item = new ListItem(getLabel("australia")); regions.add(item);
+          		}
+          		if (asmt.isCookIslands())
+          		{
+          			ListItem item = new ListItem(getLabel("cookIslands")); regions.add(item);
+          		}
+          		if (asmt.isFiji())
+          		{
+          			ListItem item = new ListItem(getLabel("fiji")); regions.add(item);
+          		}
+          		if (asmt.isFrenchPolynesia())
+          		{
+          			ListItem item = new ListItem(getLabel("frenchPolynesia")); regions.add(item);
+          		}
+          		if (asmt.isKiribati())
+          		{
+          			ListItem item = new ListItem(getLabel("kiribati")); regions.add(item);
+          		}
+          		if (asmt.isNewZealand())
+          		{
+          			ListItem item = new ListItem(getLabel("newZealand")); regions.add(item);
+          		}
+          		if (asmt.isPng())
+          		{
+          			ListItem item = new ListItem(getLabel("png")); regions.add(item);
+          		}
+          		if (asmt.isSamoa())
+          		{
+          			ListItem item = new ListItem(getLabel("samoa")); regions.add(item);
+          		}
+          		if (asmt.isSolomonIslands())
+          		{
+          			ListItem item = new ListItem(getLabel("solomonIslands")); regions.add(item);
+          		}
+          		if (asmt.isTonga())
+          		{
+          			ListItem item = new ListItem(getLabel("tonga")); regions.add(item);
+          		}
+          		if (asmt.isTuvalu())
+          		{
+          			ListItem item = new ListItem(getLabel("tuvalu")); regions.add(item);
+          		}
+          		if (asmt.isVanuatu())
+          		{
+          			ListItem item = new ListItem(getLabel("vanuatu")); regions.add(item);
+          		}
+          		if (asmt.isOtherSouthPacific())
+          		{
+          			ListItem item = new ListItem(getLabel("otherSouthPacific")); regions.add(item);
+          		}
+          		if (asmt.isPacificBasin())
+          		{
+          			ListItem item = new ListItem(getLabel("pacificBasin")); regions.add(item);
+          		}
+          		if (asmt.isGlobal())
+          		{
+          			ListItem item = new ListItem(getLabel("global")); regions.add(item);
+          		}
+          		
+        		
+          		if (regions.size() > 0)
+          		{
+           		  PdfPCell rCell = new PdfPCell(); rCell.addElement(regions);
+           		  table.addCell(new PdfPCell(new Phrase("Regions")));  table.addCell(rCell);
+          		}
+          		
+          		
+          		//status
+          		com.itextpdf.text.List status = new com.itextpdf.text.List(com.itextpdf.text.List.UNORDERED);
+          		if (asmt.isCompleted())
+          		{
+          			ListItem item = new ListItem(getLabel("completed")); status.add(item);
+          		}
+          		if (asmt.isOngoing())
+          		{
+          			ListItem item = new ListItem(getLabel("ongoing")); status.add(item);
+          		}
+          		if (asmt.isPlanned())
+          		{
+          			ListItem item = new ListItem(getLabel("planned")); status.add(item);
+          		}
+          		if (asmt.isProposed())
+          		{
+          			ListItem item = new ListItem(getLabel("proposed")); status.add(item);
+          		}
+          		
+          		if (status.size() > 0)
+          		{
+           		  PdfPCell sCell = new PdfPCell(); sCell.addElement(status);
+           		  table.addCell(new PdfPCell(new Phrase("Status")));  table.addCell(sCell);
+          		}
+          		
+          		
+          		
+          		
+          		if (StringUtils.isNotBlank(description))
+          		{
+          		  table.addCell(new PdfPCell(new Phrase("Description")));  table.addCell(new PdfPCell(new Phrase(description)));
+          		}
+
+          		if (StringUtils.isNotBlank(url))
+          		{
+            	  Anchor link = new Anchor(StringUtils.trimToEmpty(url)); link.setReference(StringUtils.trimToEmpty(url));
+          		  table.addCell(new PdfPCell(new Phrase("Url")));  table.addCell(new PdfPCell(link));
+          		}
+
+          		
+          		document.add(table);
+          		document.add(Chunk.NEWLINE);
+      		}
+              
+              
+      } catch (DocumentException de) {
+              logger.fatal(de.getMessage());
+      }
+      catch (IOException ie)
+      {
+    	 logger.warn("Could not find NOAA logo (likely)");
+    	 logger.warn(ie);
+      }
+
+      // step 5: we close the document
+      document.close();
+      ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
+      return bais;
+}
+
+  public StreamResponse onReturnStreamResponse(long id) 
+  {
+	  Asmt asmt =  (Asmt) session.load(Asmt.class, id);
+      // step 1: creation of a document-object
+      Document document = new Document();
+
+      ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+      try {
+              // step 2:
+              // we create a writer that listens to the document
+              // and directs a PDF-stream to a file
+              PdfWriter writer = PdfWriter.getInstance(document, baos);
+              // step 3: we open the document
+              document.open();
+              
+              java.awt.Image awtImage = Toolkit.getDefaultToolkit().createImage(logoAsset.getResource().toURL());
+              if (awtImage != null)
+              {
+            	  com.itextpdf.text.Image logo = com.itextpdf.text.Image.getInstance(awtImage, null); 
+            	  logo.scalePercent(50);
+            	  if (logo != null) document.add(logo);
+              }
+
+              DateFormat formatter = new SimpleDateFormat
+                      ("EEE MMM dd HH:mm:ss zzz yyyy");
+                  Date date = new Date(System.currentTimeMillis());
+                  TimeZone eastern = TimeZone.getTimeZone("Pacific/Honolulu");
+                  formatter.setTimeZone(eastern);
+
+              document.add(new Paragraph("Piko Assessments " + formatter.format(date)));
+              
+              
+              document.add(Chunk.NEWLINE);document.add(Chunk.NEWLINE);
+              
+              // create table, 2 columns
+          		String acronym = StringUtils.trimToEmpty(asmt.getCode());
+          		String name = StringUtils.trimToEmpty(asmt.getName());
+          		String description = StringUtils.trimToEmpty(asmt.getDescription());
+          		String leadAgencies = StringUtils.trimToEmpty(asmt.getOrganization());
+          		String contacts = StringUtils.trimToEmpty(asmt.getContact());
+          		String partnering = StringUtils.trimToEmpty(asmt.getPartners());
+          		String url = StringUtils.trimToEmpty(asmt.getUrl());
+          		
+          		
+                PdfPTable table = new PdfPTable(2);
+                table.setWidths(new int[]{1, 4});
+                table.setSplitRows(false);
+                
+                PdfPCell nameTitle = new PdfPCell(new Phrase("Name")); 
+                
+                if (StringUtils.isNotBlank(acronym)) name = name + " (" + acronym + ")";
+                PdfPCell nameCell = new PdfPCell(new Phrase(name));
+                
+                nameTitle.setBackgroundColor(BaseColor.CYAN);  nameCell.setBackgroundColor(BaseColor.LIGHT_GRAY);
+                
+                table.addCell(nameTitle);  table.addCell(nameCell);          		          		
+          		
+          		if (StringUtils.isNotBlank(leadAgencies))
+          		{
+          		  table.addCell(new PdfPCell(new Phrase("Lead Agencies")));  table.addCell(new PdfPCell(new Phrase(leadAgencies)));
+          		}
+
+          		if (StringUtils.isNotBlank(contacts))
+          		{
+          		  table.addCell(new PdfPCell(new Phrase("Contacts")));  table.addCell(new PdfPCell(new Phrase(contacts)));
+          		}
+                
+          		if (StringUtils.isNotBlank(partnering))
+          		{
+          		  table.addCell(new PdfPCell(new Phrase("Partnering Agencies")));  table.addCell(new PdfPCell(new Phrase(partnering)));
+          		}
+
+
+          	    // compile the types list
+          		com.itextpdf.text.List types = new com.itextpdf.text.List(com.itextpdf.text.List.UNORDERED);
+          		if (asmt.isClimateScience()) 
+          		{
+          			ListItem item = new ListItem(getLabel("climateScience")); types.add(item);
+          		}
+          		if (asmt.isNeedsAndCapabilities()) 
+          		{
+          			ListItem item = new ListItem(getLabel("needsAndCapabilities")); types.add(item);
+          		}
+          		if (asmt.isNeeds()) 
+          		{
+          			ListItem item = new ListItem(getLabel("needs")); types.add(item);
+          		}
+          		if (asmt.isCapacity()) 
+          		{
+          			ListItem item = new ListItem(getLabel("capacity")); types.add(item);
+          		}
+          		if (asmt.isCapabilities()) 
+          		{
+          			ListItem item = new ListItem(getLabel("capabilities")); types.add(item);
+          		}
+          		if (asmt.isRiskVulnerability()) 
+          		{
+          			ListItem item = new ListItem(getLabel("riskVulnerability")); types.add(item);
+          		}
+
+
+          		if(types.size() > 0)
+          		{
+          		  PdfPCell typesCell = new PdfPCell(); typesCell.addElement(types);
+          		  table.addCell(new PdfPCell(new Phrase("Types")));  table.addCell(typesCell);
+          		}
+          		
+          		
+                //Aoa
+          		com.itextpdf.text.List aoa = new com.itextpdf.text.List(com.itextpdf.text.List.UNORDERED);
+          		if(asmt.isInternational())
+          		{
+          			ListItem item = new ListItem(getLabel("international")); aoa.add(item);
+          		}
+          		if(asmt.isNational())
+          		{
+          			ListItem item = new ListItem(getLabel("national")); aoa.add(item);
+          		}
+          		if(asmt.isRegional())
+          		{
+          			ListItem item = new ListItem(getLabel("regional")); aoa.add(item);
+          		}
+          		
+          		if (aoa.size() > 0)
+          		{
+           		  PdfPCell aoaCell = new PdfPCell(); aoaCell.addElement(aoa);
+           		  table.addCell(new PdfPCell(new Phrase("Area of Applicability")));  table.addCell(aoaCell);
+          		}
+          		
+          		// focus area
+          		com.itextpdf.text.List fa = new com.itextpdf.text.List(com.itextpdf.text.List.UNORDERED);
+          		if(asmt.isWater())
+          		{
+          			ListItem item = new ListItem(getLabel("water")); fa.add(item);
+          		}
+          		if(asmt.isCoastal())
+          		{
+          			ListItem item = new ListItem(getLabel("coastal")); fa.add(item);
+          		}
+          		if(asmt.isEcosystem())
+          		{
+          			ListItem item = new ListItem(getLabel("ecosystem")); fa.add(item);
+          		}
+          		
+          		if (fa.size() > 0)
+          		{
+           		  PdfPCell faCell = new PdfPCell(); faCell.addElement(fa);
+           		  table.addCell(new PdfPCell(new Phrase("Focus Area")));  table.addCell(faCell);
+          		}
+
+               
+          		//region
+          		com.itextpdf.text.List regions = new com.itextpdf.text.List(com.itextpdf.text.List.UNORDERED);
+          		if (asmt.isCentralNorthPacific())
+          		{
+          			ListItem item = new ListItem(getLabel("centralNorthPacific")); regions.add(item);
+          		}
+          		if (asmt.isStateOfHawaii())
+          		{
+          			ListItem item = new ListItem(getLabel("stateOfHawaii")); regions.add(item);
+          		}
+          		if (asmt.isNorthWestHawaiianIslands())
+          		{
+          			ListItem item = new ListItem(getLabel("northWesternHawaiianIslands")); regions.add(item);
+          		}
+          		if (asmt.isPacificRemoteIslands())
+          		{
+          			ListItem item = new ListItem(getLabel("pacificRemoteIslands")); regions.add(item);
+          		}
+          		if (asmt.isWesternNorthPacific())
+          		{
+          			ListItem item = new ListItem(getLabel("westernNorthPacific")); regions.add(item);
+          		}
+          		if (asmt.isCnmi())
+          		{
+          			ListItem item = new ListItem(getLabel("cnmi")); regions.add(item);
+          		}
+          		if (asmt.isFsm())
+          		{
+          			ListItem item = new ListItem(getLabel("fsm")); regions.add(item);
+          		}
+          		if (asmt.isGuam())
+          		{
+          			ListItem item = new ListItem(getLabel("guam")); regions.add(item);
+          		}
+          		if (asmt.isPalau())
+          		{
+          			ListItem item = new ListItem(getLabel("palau")); regions.add(item);
+          		}
+          		if (asmt.isRmi())
+          		{
+          			ListItem item = new ListItem(getLabel("rmi")); regions.add(item);
+          		}
+          		if (asmt.isOtherWesternNorthPacific())
+          		{
+          			ListItem item = new ListItem(getLabel("otherWesternNorthPacific")); regions.add(item);
+          		}
+          		if (asmt.isSouthPacific())
+          		{
+          			ListItem item = new ListItem(getLabel("southPacific")); regions.add(item);
+          		}
+          		if (asmt.isAmericanSamoa())
+          		{
+          			ListItem item = new ListItem(getLabel("americanSamoa")); regions.add(item);
+          		}
+          		if (asmt.isAustralia())
+          		{
+          			ListItem item = new ListItem(getLabel("australia")); regions.add(item);
+          		}
+          		if (asmt.isCookIslands())
+          		{
+          			ListItem item = new ListItem(getLabel("cookIslands")); regions.add(item);
+          		}
+          		if (asmt.isFiji())
+          		{
+          			ListItem item = new ListItem(getLabel("fiji")); regions.add(item);
+          		}
+          		if (asmt.isFrenchPolynesia())
+          		{
+          			ListItem item = new ListItem(getLabel("frenchPolynesia")); regions.add(item);
+          		}
+          		if (asmt.isKiribati())
+          		{
+          			ListItem item = new ListItem(getLabel("kiribati")); regions.add(item);
+          		}
+          		if (asmt.isNewZealand())
+          		{
+          			ListItem item = new ListItem(getLabel("newZealand")); regions.add(item);
+          		}
+          		if (asmt.isPng())
+          		{
+          			ListItem item = new ListItem(getLabel("png")); regions.add(item);
+          		}
+          		if (asmt.isSamoa())
+          		{
+          			ListItem item = new ListItem(getLabel("samoa")); regions.add(item);
+          		}
+          		if (asmt.isSolomonIslands())
+          		{
+          			ListItem item = new ListItem(getLabel("solomonIslands")); regions.add(item);
+          		}
+          		if (asmt.isTonga())
+          		{
+          			ListItem item = new ListItem(getLabel("tonga")); regions.add(item);
+          		}
+          		if (asmt.isTuvalu())
+          		{
+          			ListItem item = new ListItem(getLabel("tuvalu")); regions.add(item);
+          		}
+          		if (asmt.isVanuatu())
+          		{
+          			ListItem item = new ListItem(getLabel("vanuatu")); regions.add(item);
+          		}
+          		if (asmt.isOtherSouthPacific())
+          		{
+          			ListItem item = new ListItem(getLabel("otherSouthPacific")); regions.add(item);
+          		}
+          		if (asmt.isPacificBasin())
+          		{
+          			ListItem item = new ListItem(getLabel("pacificBasin")); regions.add(item);
+          		}
+          		if (asmt.isGlobal())
+          		{
+          			ListItem item = new ListItem(getLabel("global")); regions.add(item);
+          		}
+          		
+        		
+          		if (regions.size() > 0)
+          		{
+           		  PdfPCell rCell = new PdfPCell(); rCell.addElement(regions);
+           		  table.addCell(new PdfPCell(new Phrase("Regions")));  table.addCell(rCell);
+          		}
+          		
+          		
+          		//status
+          		com.itextpdf.text.List status = new com.itextpdf.text.List(com.itextpdf.text.List.UNORDERED);
+          		if (asmt.isCompleted())
+          		{
+          			ListItem item = new ListItem(getLabel("completed")); status.add(item);
+          		}
+          		if (asmt.isOngoing())
+          		{
+          			ListItem item = new ListItem(getLabel("ongoing")); status.add(item);
+          		}
+          		if (asmt.isPlanned())
+          		{
+          			ListItem item = new ListItem(getLabel("planned")); status.add(item);
+          		}
+          		if (asmt.isProposed())
+          		{
+          			ListItem item = new ListItem(getLabel("proposed")); status.add(item);
+          		}
+          		
+          		if (status.size() > 0)
+          		{
+           		  PdfPCell sCell = new PdfPCell(); sCell.addElement(status);
+           		  table.addCell(new PdfPCell(new Phrase("Status")));  table.addCell(sCell);
+          		}
+          		
+          		
+          		
+          		
+          		if (StringUtils.isNotBlank(description))
+          		{
+          		  table.addCell(new PdfPCell(new Phrase("Description")));  table.addCell(new PdfPCell(new Phrase(description)));
+          		}
+
+          		if (StringUtils.isNotBlank(url))
+          		{
+            	  Anchor link = new Anchor(StringUtils.trimToEmpty(url)); link.setReference(StringUtils.trimToEmpty(url));
+          		  table.addCell(new PdfPCell(new Phrase("Url")));  table.addCell(new PdfPCell(link));
+          		}
+
+          		
+          		document.add(table);
+          		document.add(Chunk.NEWLINE);
+      		
+              
+              
+      } catch (DocumentException de) {
+              logger.fatal(de.getMessage());
+      }
+      catch (IOException ie)
+      {
+    	 logger.warn("Could not find NOAA logo (likely)");
+    	 logger.warn(ie);
+      }
+
+      // step 5: we close the document
+      document.close();
+      ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
+      return new PDFStreamResponse(bais,"PacisAssessment" + System.currentTimeMillis());
+  }	  
+	  
+
   ///////////////////////////////////////////////////////
   // private methods 
   
@@ -578,4 +1292,14 @@ public class Index
 	asmt.setRegional(false);
   }
 
+  
+
+  private String getLabel (String varName)
+  {
+	   String key = varName + "-label";
+	   String value = "";
+	   if (messages.contains(key)) value = messages.get(key);
+	   else value = TapestryInternalUtils.toUserPresentable(varName);
+	   return StringUtils.trimToEmpty(value);
+  }
 }
